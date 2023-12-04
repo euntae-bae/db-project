@@ -18,12 +18,11 @@ CREATE TABLE Members(
 CREATE TABLE Attendance(
 	attDate DATE NOT NULL,
 	sid INT NOT NULL,
-	arrivalDatetime TIME,
-	leaveDatetime   TIME,
+	arrivalTtime TIME,
+	leaveTime   TIME,
 	PRIMARY KEY(sid, attDate),
 	FOREIGN KEY (sid)
 		REFERENCES Members(stdId)
-		ON DELETE CASCADE
 );
 
 CREATE TABLE DaysOff(

@@ -45,8 +45,16 @@ const pagePrefix = `<!DOCTYPE html><html>
     tr:nth-child(even) {
         background-color: #f4f6f7;
     }
-    li {
-        background-color: #abebc6;
+    ul.tabnav {
+        background-color: #e8f6f3
+        margin: 0px;
+        padding: 0px;
+        list-style: none;
+    }
+    ul.tabnav li {
+        background-color: #e8f8f5;
+        display: inline-block;
+        padding: 10px 15px;
     }
 </style>
 </head> 
@@ -90,8 +98,6 @@ app.use('/static', express.static(path.join(__dirname, 'html')));
 app.use('/static', express.static(path.join(__dirname, 'images')));
 
 app.get('/', (req, res) => {
-    console.log("근태현황개요");
-
     let stdId = req.query.stdid;
     const formActionName = `/`;
 
@@ -110,19 +116,29 @@ app.get('/', (req, res) => {
 
     // 학번, 이름, 학위과정, 출근일수, 총근무시간, 잔여반차
     //let tupleList = [];
-    let query = `SELECT stdId, name, course, (SELECT COUNT(*) FROM Attendance WHERE Attendance.sid = Members.stdId) attDay
-    FROM Members`;
+    let query = `
+    SELECT stdId, name, course,
+        COUNT(attDate) AS workDay, 
+        SUM(HOUR(TIMEDIFF(leaveTime, arrivalTime))) AS workTime
+    FROM Members AS mem 
+        LEFT OUTER JOIN Attendance AS att
+        ON mem.stdId = att.sid
+    GROUP BY stdId`;
     if ((stdId != undefined) && (stdId.length != 0)) {
-        query += ` WHERE stdId=${stdId}`;
+        query += ` HAVING stdId=${stdId}`;
         //console.log(query);
     }
     connection.query(query, (error, rows, fields) => {
         if (error) throw error;
         // console.log(rows);
         rows.forEach((row) => {
-            course = courseTab[row.course];
+            let course = courseTab[row.course];
+            let workTime = row.workTime;
+            if (workTime == null)
+                workTime = 0;
             pageOut += `<tr>`;
-            pageOut += `<td>${row.stdId}</td><td>${row.name}</td><td>${course}</td><td>${row.attDay}</td>`;
+            pageOut += `<td>${row.stdId}</td><td>${row.name}</td><td>${course}</td>`;
+            pageOut += `<td>${row.workDay}</td><td>${workTime}</td>`;
             pageOut += `<td></td><td></td>`;
             pageOut += `</tr>`;
         });
@@ -133,7 +149,6 @@ app.get('/', (req, res) => {
 });
 
 app.get('/detailed', (req, res) => {
-    console.log("근태현황 상세");
     let stdId = req.query.stdid;
     const formActionName = `/detailed`;
 
@@ -166,8 +181,8 @@ app.get('/detailed', (req, res) => {
         FROM Members mem
             INNER JOIN Attendance att
             ON mem.stdId = att.sid
-        WHERE stdId = ${stdId}
-        `;
+        WHERE stdId = ${stdId}`;
+        //query += ` HAVING stdId=${stdId}`;
     }
 
     connection.query(query, (error, rows, fields) => {
@@ -208,10 +223,8 @@ app.get('/late', (req, res) => {
     <th>학위과정</th>
     <th>날짜</th>
     <th>출근</th>
-    <th>퇴근</th>
-    <th>합</th>
-    <th>잔여반차</th>`;
-    // 학번, 이름, 학위과정, 날짜, 출근, 퇴근, 합, 잔여 반차
+    <th>퇴근</th>`;
+    // 학번, 이름, 학위과정, 날짜, 출근, 퇴근
 
     pageOut += pageSuffix;
     res.send(pageOut);

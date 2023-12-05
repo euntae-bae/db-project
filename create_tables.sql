@@ -18,7 +18,7 @@ CREATE TABLE Members(
 CREATE TABLE Attendance(
 	attDate DATE NOT NULL,
 	sid INT NOT NULL,
-	arrivalTtime TIME,
+	arrivalTime TIME,
 	leaveTime   TIME,
 	PRIMARY KEY(sid, attDate),
 	FOREIGN KEY (sid)

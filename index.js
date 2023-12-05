@@ -76,7 +76,7 @@ const pagePrefix = `<!DOCTYPE html><html>
     <div class="tab">
         <ul class="tabnav">
             <li><a href="/">근태현황개요</a></li>
-            <li><a href="/insert-att-info">출퇴근 기록</a></li>
+            <li><a href="/insert-att-info">출퇴근 기록하기</a></li>
             <li><a href="/detailed">근태현황 상세</a></li>
 <!--            <li><a href="/late">지각 내역</a></li> -->
             <li><a href="/day-off">연차 및 반차 사용 내역</a></li>
@@ -98,6 +98,11 @@ const courseTab = {
     'und': '인턴',
     'msd': '석사과정',
     'phd': '박사과정'
+};
+
+const doTypeTab = {
+    1: '반차',
+    2: '연차'
 };
 
 // __dirname: 현재 프로젝트의 절대경로
@@ -326,23 +331,72 @@ app.get('/late', (req, res) => {
 
 app.get('/day-off', (req, res) => {
     let stdId = req.query.stdid;
-    let formActionName = `/day-off`;
+    let formActionName = '/day-off';
 
     pageOut = '';
     pageOut += pagePrefix;
     pageOut += pageFormPrefix;
     pageOut += formActionName;
     pageOut += pageFormSuffix;
-    pageOut += `<table>
-    <th>학번</th>
-    <th>이름</th>
-    <th>학위과정</th>
-    <th>구분</th>
-    <th>날짜</th>
-    <th>잔여반차</th>`;
-    // 학번, 이름, 학위과정, 구분(연차/반차), 날짜
-    pageOut += pageSuffix;
-    res.send(pageOut);
+    pageOut += `<h3>휴가 신청 내역</h3>`;   // 학번, 이름, 학위과정, 날짜, 구분(연차/반차)
+    pageOut += `<table><th>학번</th><th>이름</th><th>학위과정</th><th>날짜</th><th>구분</th>`;
+
+    let queryDayoff = `
+    SELECT stdId, name, course, doDate, doType
+    FROM Members AS mem
+        INNER JOIN DaysOff AS doff
+        ON mem.stdId = doff.sid
+    ORDER BY doDate ASC`;
+
+    let queryDayoffFull = `
+    SELECT stdId, name, course, doDate, doType
+    FROM Members AS mem
+        LEFT OUTER JOIN DaysOff AS doff
+        ON mem.stdId = doff.sid
+    WHERE doDate IS NOT NULL AND doDate <= NOW()
+    UNION
+    SELECT stdId, name, course, attDate,  
+        CASE
+        WHEN arrivalTime >= '14:31:00' OR leaveTime < '14:30:00' THEN 2
+        WHEN arrivalTime >= '11:31:00' OR (leaveTime >= '14:30:00' AND leaveTime < '18:00:00') THEN 1
+        ELSE 100
+        END AS doType
+    FROM Members AS mem
+        LEFT OUTER JOIN Attendance AS att
+        ON mem.stdId = att.sid
+    WHERE attDate IS NOT NULL AND (arrivalTime >= '11:31:00' OR leaveTime < '18:00:00')
+    ORDER BY doDate, stdId ASC`;
+
+    connection.query(queryDayoff, (error, rows, fields) => {
+        console.log(queryDayoff);
+        if (error) throw error;
+        rows.forEach((row) => {
+            let course = courseTab[row.course];
+            let doType = doTypeTab[row.doType];
+            pageOut += `<tr>`;
+            pageOut += `<td>${row.stdId}</td><td>${row.name}</td><td>${course}</td><td>${row.doDate}</td><td>${doType}</td>`;
+            pageOut += `</tr>`;
+        });
+        pageOut += '</table><br>';
+        // 현재까지 기준으로 출력 (오늘 기준으로는 미사용)
+        pageOut += '<h3>전체 휴가 사용내역</h3>';   // 학번, 이름, 학위과정, 날짜, 구분
+        pageOut += `<table><th>학번</th><th>이름</th><th>학위과정</th><th>날짜</th><th>구분</th>`;
+        
+        connection.query(queryDayoffFull, (error, rows, fields) => {
+            console.log(queryDayoffFull);
+            if (error) throw error;
+            rows.forEach((row) => {
+                let course = courseTab[row.course];
+                let doType = doTypeTab[row.doType];
+                pageOut += `<tr>`;
+                pageOut += `<td>${row.stdId}</td><td>${row.name}</td><td>${course}</td><td>${row.doDate}</td><td>${doType}</td>`;
+                pageOut += `</tr>`;
+            });
+            pageOut += `</table>`;
+            pageOut += pageSuffix;
+            return res.send(pageOut);
+        });
+    });
 });
 
 app.get('/std-info', (req, res) => {
@@ -435,23 +489,23 @@ app.post('/delete-std-info', (req, res) => {
     });
 });
 
-app.get('/query', (req, res) => {
-    connection.query('SELECT * FROM Members', (error, rows, fields) => {
-        if (error) throw error;
-        //console.log('Members info is', rows);
-        pageOut = '';
-        pageOut += pagePrefix;
+// app.get('/query', (req, res) => {
+//     connection.query('SELECT * FROM Members', (error, rows, fields) => {
+//         if (error) throw error;
+//         //console.log('Members info is', rows);
+//         pageOut = '';
+//         pageOut += pagePrefix;
 
-        rows.forEach((row) => {
-            //console.log(`${row.name}'s ID is ${row.stdId}`);
-            pageOut += `${row.name}'s ID is ${row.stdId}<br>`;
-        });
+//         rows.forEach((row) => {
+//             //console.log(`${row.name}'s ID is ${row.stdId}`);
+//             pageOut += `${row.name}'s ID is ${row.stdId}<br>`;
+//         });
 
-        pageOut += pageSuffix;
+//         pageOut += pageSuffix;
         
-        res.send(pageOut);
-    });
-});
+//         res.send(pageOut);
+//     });
+// });
 
 app.listen(portNum, () => {
     console.log('Express App on port ', portNum);

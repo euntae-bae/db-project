@@ -12,8 +12,7 @@ CREATE TABLE Members(
 	name  VARCHAR(15) NOT NULL,
 	email VARCHAR(256),
 	phone VARCHAR(15),
-	course CHAR(3) NOT NULL, 
-	dayOff INT);
+	course CHAR(3) NOT NULL);
 
 CREATE TABLE Attendance(
 	attDate DATE NOT NULL,

@@ -1,8 +1,10 @@
 const express = require('express');
+const bodyParser = require('body-parser');
 const path = require('path');
 const app = express();
-//const bodyParser = require('body-parser');
-//app.use(bodyParser.urlencoded({extended: true}));
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({extended: false}));
 
 const mysql = require('mysql');
 const connection = mysql.createConnection({
@@ -56,6 +58,10 @@ const pagePrefix = `<!DOCTYPE html><html>
         display: inline-block;
         padding: 10px 15px;
     }
+    ul.insert-form li {
+        display: block;
+        padding: 10px 10px;
+    }
 </style>
 </head> 
 <body> 
@@ -70,10 +76,12 @@ const pagePrefix = `<!DOCTYPE html><html>
     <div class="tab">
         <ul class="tabnav">
             <li><a href="/">근태현황개요</a></li>
+            <li><a href="/insert-att-info">출퇴근 기록</a></li>
             <li><a href="/detailed">근태현황 상세</a></li>
             <li><a href="/late">지각 내역</a></li>
             <li><a href="/day-off">연차 및 반차 사용 내역</a></li>
             <li><a href="/std-info">학생 정보 조회</a></li>
+            <li><a href="/insert-std-info">학생 정보 추가</a></li>
         </ul>
     </div>
 </div>`;
@@ -101,7 +109,7 @@ app.get('/', (req, res) => {
     let stdId = req.query.stdid;
     const formActionName = `/`;
 
-    pageOut = '';
+    let pageOut = '';
     pageOut += pagePrefix;
     pageOut += pageFormPrefix;
     pageOut += formActionName;
@@ -111,10 +119,9 @@ app.get('/', (req, res) => {
     <th>이름</th>
     <th>학위과정</th>
     <th>출근일수</th>
-    <th>총근무시간</th>
-    <th>잔여반차</th>`;
+    <th>총근무시간</th>`;
 
-    // 학번, 이름, 학위과정, 출근일수, 총근무시간, 잔여반차
+    // 학번, 이름, 학위과정, 출근일수, 총근무시간
     //let tupleList = [];
     let query = `
     SELECT stdId, name, course,
@@ -139,12 +146,99 @@ app.get('/', (req, res) => {
             pageOut += `<tr>`;
             pageOut += `<td>${row.stdId}</td><td>${row.name}</td><td>${course}</td>`;
             pageOut += `<td>${row.workDay}</td><td>${workTime}</td>`;
-            pageOut += `<td></td><td></td>`;
             pageOut += `</tr>`;
         });
         pageOut += '</table>';
         pageOut += pageSuffix;
         res.send(pageOut);
+    });
+});
+
+app.get('/insert-att-info', (req, res) => {
+    let pageOut = '';
+    pageOut += pagePrefix;
+    pageOut += `<div><form action="/insert-att-info" accept-charset="utf-8" method="post">
+    <fieldset>
+        <ul class="insert-form">
+            <li>
+                <label for="stdid">학번</label>
+                <input type="text" pattern="[0-9]{9}" name="stdid" id="stdid">
+            </li>
+            <li>
+                구분<br>
+                <ul>
+                    <li>
+                        <label for="att-type-arrival">출근</label>
+                        <input type="radio" name="att_type" id="att-type-arrival" value="arrival" checked>
+                    </li>
+                    <li>
+                        <label for="att-type-leave">퇴근</label>
+                        <input type="radio" name="att_type" id="att-type-leave" value="leave">
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <label for="att-date">날짜</label>
+                <input type="date" name="att_date" id="att-date">
+            </li>
+            <li>
+                <label for="att-time">시간</label>
+                <input type="time" step="any" name="att_time" id="att-time" value="00:00:00">
+            </li>
+            <li>
+                <input type="submit" value="제출">
+            </li>
+        </ul>
+    </fieldset>
+    </div>`;
+    pageOut += pageSuffix;
+    res.send(pageOut);
+});
+
+app.post('/insert-att-info', (req, res) => {
+    let msgSuffix = `window.location.replace('/insert-att-info');</script>`;
+    let querySelect         = `SELECT * FROM Members WHERE stdId='${req.body.stdid}'`;
+    let queryInsertArrival  = `INSERT INTO Attendance (attDate, sid, arrivalTime) VALUES ('${req.body.att_date}', ${req.body.stdid}, '${req.body.att_time}')`;
+    let queryInsertLeave    = `UPDATE Attendance SET leaveTime='${req.body.att_time}' WHERE sid=${req.body.stdid} AND attDate='${req.body.att_date}'`;
+
+    console.log(req.body);
+    
+    // 사용자가 존재하는지 검색
+    connection.query(querySelect, (error, rows, fields) => {
+        console.log(querySelect);
+        if (error) throw error;
+        console.log(rows);
+        if (rows.length == 0) {
+            let msg = `<script>alert('사용자를 찾을 수 없습니다.');`;
+            msg += msgSuffix;
+            return res.send(msg);
+        }
+        // 사용자가 존재할 경우 입력된 정보를 데이터베이스에 삽입
+        if (req.body.att_type === 'arrival') { // 출근 처리
+            connection.query(queryInsertArrival, (error, rows, fields) => {
+                console.log(queryInsertArrival);
+                if (error) throw error;
+
+                let msg = `<script>alert('정상적으로 출근 처리되었습니다.');`;
+                msg  += msgSuffix;
+                return res.send(msg);
+            });
+        }
+        else if (req.body.att_type === 'leave') { // 퇴근 처리
+            connection.query(queryInsertLeave, (error, rows, fields) => {
+                console.log(queryInsertLeave);
+                if (error) throw error;
+
+                let msg = `<script>alert('정상적으로 퇴근 처리되었습니다.');`;
+                msg  += msgSuffix;
+                return res.send(msg);
+            });
+        }
+        else {
+            let msg = `<script>alert('Error: 비정상적인 접근이 감지되었습니다.');`;
+            msg += msgSuffix;
+            return res.send(msg);
+        }
     });
 });
 

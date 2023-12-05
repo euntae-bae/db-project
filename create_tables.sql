@@ -22,10 +22,15 @@ CREATE TABLE Attendance(
 	PRIMARY KEY(sid, attDate),
 	FOREIGN KEY (sid)
 		REFERENCES Members(stdId)
+		ON DELETE CASCADE
 );
 
 CREATE TABLE DaysOff(
 	doDate DATE NOT NULL,
 	sid INT NOT NULL,
-	doType INT NOT NULL
+	doType INT NOT NULL,
+	PRIMARY KEY(sid, doDate),
+	FOREIGN KEY (sid)
+		REFERENCES Members(stdId)
+		ON DELETE CASCADE
 );

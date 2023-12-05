@@ -78,10 +78,11 @@ const pagePrefix = `<!DOCTYPE html><html>
             <li><a href="/">근태현황개요</a></li>
             <li><a href="/insert-att-info">출퇴근 기록</a></li>
             <li><a href="/detailed">근태현황 상세</a></li>
-            <li><a href="/late">지각 내역</a></li>
+<!--            <li><a href="/late">지각 내역</a></li> -->
             <li><a href="/day-off">연차 및 반차 사용 내역</a></li>
             <li><a href="/std-info">학생 정보 조회</a></li>
-            <li><a href="/insert-std-info">학생 정보 추가</a></li>
+<!--            <li><a href="/insert-std-info">학생 정보 추가</a></li> -->
+            <li><a href="/delete-std-info">학생 정보 삭제</a></li>
         </ul>
     </div>
 </div>`;
@@ -302,7 +303,6 @@ app.get('/detailed', (req, res) => {
 });
 
 app.get('/late', (req, res) => {
-    console.log("지각 내역");
     let stdId = req.query.stdid;
     let formActionName = `/late`;
 
@@ -325,7 +325,6 @@ app.get('/late', (req, res) => {
 });
 
 app.get('/day-off', (req, res) => {
-    console.log("연차 및 반차 사용 내역");
     let stdId = req.query.stdid;
     let formActionName = `/day-off`;
 
@@ -341,13 +340,12 @@ app.get('/day-off', (req, res) => {
     <th>구분</th>
     <th>날짜</th>
     <th>잔여반차</th>`;
-    // 학번, 이름, 학위과정, 구분(연차/반차), 날짜, 잔여 반차
+    // 학번, 이름, 학위과정, 구분(연차/반차), 날짜
     pageOut += pageSuffix;
     res.send(pageOut);
 });
 
 app.get('/std-info', (req, res) => {
-    console.log("학생 정보 조회");
     let stdId = req.query.stdid;
     let formActionName = `/std-info`;
     pageOut = '';
@@ -384,6 +382,56 @@ app.get('/std-info', (req, res) => {
         pageOut += '</table>';
         pageOut += pageSuffix;
         res.send(pageOut);
+    });
+});
+
+app.get('/delete-std-info', (req, res) => {
+    let pageOut = '';
+    pageOut += pagePrefix;
+    pageOut += `<h3>목록에서 삭제할 학생의 학번을 입력하세요</h3>`;
+    pageOut += `<div><form action="/delete-std-info" accept-charset="utf-8" method="post">
+    <fieldset>
+        <ul class="insert-form">
+            <li>
+                <label for="stdid">학번</label>
+                <input type="text" pattern="[0-9]{9}" name="stdid" id="stdid">
+            </li>
+            <li>
+                <input type="submit" value="제출">
+            </li>
+        </ul>
+    </fieldset>
+    </div>`;
+    pageOut += pageSuffix;
+    res.send(pageOut);
+});
+
+app.post('/delete-std-info', (req, res) => {
+    let msgSuffix = `window.location.replace('/delete-std-info');</script>`;
+    let querySelect = `SELECT * FROM Members WHERE stdId=${req.body.stdid}`;
+    let queryDelete = `DELETE FROM Members WHERE stdId=${req.body.stdid}`;
+
+    console.log(req.body);
+
+    // 사용자가 존재하는지 검색
+    connection.query(querySelect, (error, rows, fields) => {
+        console.log(querySelect);
+        if (error) throw error;
+        console.log(rows);
+        if (rows.length == 0) {
+            let msg = `<script>alert('사용자를 찾을 수 없습니다.');`;
+            msg += msgSuffix;
+            return res.send(msg);
+        }
+
+        connection.query(queryDelete, (error, rows, fields) => {
+            console.log(queryDelete);
+            if (error) throw error;
+
+            let msg = `<script>alert('정상적으로 삭제되었습니다.');`;
+            msg  += msgSuffix;
+            return res.send(msg);
+        });
     });
 });
 
